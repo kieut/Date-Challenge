@@ -3,24 +3,27 @@ const File  = require('fs');
 const Path  = require('path');
 
 
-// we have to calculate start and end time to calculate latency
-// take average of responses and add latency to get more accurate time
+// We make parallel requests to list of servers and calculate the average of
+// all server time responses for the current time. We then calculate the
+// latency (endTime - startime) and add it to the current time(avg time) in order to
+// get a more accurate time. Script prints out the time in ISO 8601
+// format to the console
+
 const startTime = Date.now();
 
 checkAllServersInParallel('hostnames.txt')
 .then(function(data) {
-  // console.log('data:', data);
-
   const avgTime = getAverageTime(data); // avg time of all server times
   const latency = Date.now() - startTime; // add latency to average
+  const avgTimePlusLatency = new Date(avgTime + latency);
 
-  let avgTimePlusLatency = new Date(avgTime + latency);
   console.log(`Date: ${avgTimePlusLatency}.`);
   console.log(`Time in ISO 8601: ${avgTimePlusLatency.toISOString()}`);
 })
 .catch(error => console.log(error));
 
 
+// Returns a promise that resolves when all servers are checked.
 function checkAllServersInParallel(filename) {
   const listOfServers =  getListOfServers(filename);
   const promisedServerResponses = listOfServers.map(server => checkServer(server));
@@ -29,20 +32,7 @@ function checkAllServersInParallel(filename) {
 }
 
 
-function getAverageTime(results) {
-  let total = 0;
-  let validResults = 0;
-  results.forEach(function(result) {
-    if (result && result.timeInMs){
-      total += result.timeInMs;
-      validResults++;
-    }
-  });
-  const avgTime = total / validResults;
-  return avgTime;
-}
-
-
+// Returns a promise
 function checkServer(server) {
   return httpGet(server)
   .then(function(res) {
@@ -69,6 +59,21 @@ function httpGet(server) {
         reject(error);
     });
   });
+}
+
+
+// Averages the time in ms from all servers responses.
+function getAverageTime(results) {
+  let total = 0;
+  let validResults = 0;
+  results.forEach(function(result) {
+    if (result && result.timeInMs){
+      total += result.timeInMs;
+      validResults++;
+    }
+  });
+  const avgTime = total / validResults;
+  return avgTime;
 }
 
 
